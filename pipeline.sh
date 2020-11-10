@@ -7,3 +7,4 @@ if [[ ! -d "$wdir" ]]; then $wdir="$PWD"; fi
 echo " #### Cutadapt : $Cutadapt"
 echo " #### SeqPrep : $SeqPrep"
 echo " #### BWA : $BWA"
+echo " #### Bedtools : $BedTools"

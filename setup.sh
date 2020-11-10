@@ -62,13 +62,13 @@ fi
 
 
 # BedTools
-BedTools="$binDir/"
+BedTools="$binDir/bedtools2/bin/bedtools"
 if [[ -x "$(command -v $BedTools)" ]]
 then
     echo "BedTools is found at $BedTools"
 else
     echo "install BedTools ... "
-    bin_dir="$binDir/bedtools2"
+    bin_dir="$binDir"
     if [[ -d $bin_dir ]]
     then
         echo "$bin_dir exist skip create the dir"
@@ -76,13 +76,9 @@ else
         mkdir $bin_dir
     fi
     cd $bin_dir
-    wget https://github.com/arq5x/bedtools2/releases/download/v2.29.2/bedtools-2.29.2.tar.gz
-    tar -zxvf bedtools-2.29.2.tar.gz
+    git clone https://github.com/arq5x/bedtools2.git
     cd "$bin_dir/bedtools2"
     make
-    echo "BedTools was installed at $bin_dir/bedtools2"
+    echo "BedTools was installed at $bin_dir/bedtools2/bin"
     cd $wdir
-    
-    echo "sss"
-    echo "ooo"
 fi
