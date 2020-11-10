@@ -29,13 +29,20 @@ def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
         (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
 
 # Run BLAST for a bam file
-def CreateBED(bedtools, id, db_fasta, bed, outdir):
+def CreateBED(config):
     try:
         wdir = pathlib.Path(__file__).parent.absolute()
+
+        bedtools = config['bedtools']
+        name = config['name']
+        db_fasta = config['fasta']
+        bed = config['bedfile']
+        outdir = config['out_dir']
+
         print("Begin process for genreate BED file ...")
-        cmd_bash = wdir+"/"+id+".sh"
+        cmd_bash = wdir+"/"+name+".sh"
         CMD_FILE = open(cmd_bash, "w")
-        out_bed_file = outdir + "/"+id+"_seq.bed"
+        out_bed_file = outdir + "/"+name+"_seq.bed"
         # bedtools getfasta -fi hg38.fa -bed hg38_knownGene.bed -bedOut>hg38_knownGene_seq.bed
         bedtools_cmd = bedtools+" getfasta -fi "+db_fasta+" -bed "+bed+ " -bedOut > "+out_bed_file
         print(bedtools_cmd)
@@ -46,7 +53,7 @@ def CreateBED(bedtools, id, db_fasta, bed, outdir):
         process.wait()
         print (process.returncode)
         os.remove(cmd_bash)
-        print("Finish processing " + id)
+        print("Finish processing " + name)
         return out_bed_file
     except():
         print("Unexpected error:", sys.exc_info()[0])
@@ -71,7 +78,14 @@ def circ_amplifySeq(seq, length):
     return (ext_seq[start: end], start, end)
 
 
-def GeneateFastQ(config, bedfile, fastq1, fastq2, ecc_tsv, col_index=12):
+def GeneateFastQ(config):
+    bedfile = config['bedfile']
+    fastq1 = config['out_dir']+"/"+config['name']+"_1.fastq"
+    fastq2 = config['out_dir']+"/"+config['name']+"_2.fastq"
+    ecc_tsv = config['out_dir']+"/"+config['name']+".tsv"
+    
+    
+    col_index=12
     #seqs = getSeq(bedfile)
     BED=open(bedfile,'r')
     TSV=open(ecc_tsv,'w')
@@ -155,14 +169,15 @@ def GeneateFastQ(config, bedfile, fastq1, fastq2, ecc_tsv, col_index=12):
 def printHelp():
     print('#############################################################')
     print('# Usage: python eccSimulator.py -t b -f fasta -b bedfile, -t bedtools, -o outbed')
-    print('# -t : The processing type, b: geneate bed file with seqeunce')
+    print('# -t : The processing type, b: geneate bed file with seqeunces')
+    print('# -n : The name of project')
     print('# -f : The path of the genomeic FASTA file')
     print('# -b : The path of the tareget regions (BED file)')
-    print('# -t : The path of the bedtools2 (avaiable at https://github.com/arq5x/bedtools2), default: >')
-    print('# -o : The path of the output bed file (with seqeunces)>')
+    print('# -e : The path of the bedtools2 (avaiable at https://github.com/arq5x/bedtools2), default: >')
+    print('# -o : The path of the output dir ')
 
     print('#############################################################')
-    print('# Usage: python eccSimulator.py -t g -n -b bedfile, -i 10 .... ')
+    print('# Usage: python eccSimulator.py -t g -n -b bedfile, -i 12 .... ')
     print('# -t : The processing type, g: geneate FASTQs')
     print('# -n : The name of project')
     print('# -b : Absolute path of tareget regions (BED file) with sequence information')
@@ -182,15 +197,25 @@ def printHelp():
     print('# -el : The min and max of ecc fragments, eg: 180,800')
     print('# -l : The pair-end read length, default: 75')
     print('# -r : The number of reads in output FASTQ file, default : 100000')
-    print('# Output 1: <out_dir>/ecc_bed , Reads numbers, processing time for each sample')
-    print('# Output 2: <out_dir>/fastq_1 & fastq_2 , Two pair-end FASTQ files')
+    print('# -o : The path of the output dir ')
+    print('# Output 1: <out_dir>/<name>_ecc.tsv , Reads numbers, processing time for each sample')
+    print('# Output 2: <out_dir>/<name>_1.fastq & fastq_2 , Two pair-end FASTQ files')
+    print('# Output 3: <out_dir>/ecc_tsv , Two pair-end FASTQ files')
 
 # Main function
 def main(argv):
-    print(eccRegion("ATTTATTAGGGGGAACCCCATTT",4,3,2,10,1))
-    print(circ_amplifySeq("ATTTATTAGGGGGAACCCCATTT",800))
-    
-    config_key_ls = [
+    #print(eccRegion("ATTTATTAGGGGGAACCCCATTT",4,3,2,10,1))
+    #print(circ_amplifySeq("ATTTATTAGGGGGAACCCCATTT",800))
+    bed_key_ls= [
+        # Input settings
+        "name",
+        "fastq",
+        "bedfile",
+        "seq_index",
+        "bedtools",
+        "out_dir"
+    ]
+    fastq_key_ls = [
         # Input settings
         "name",
         "bedfile",
@@ -216,17 +241,16 @@ def main(argv):
         "read_len",
 
         # Output settings
-        "reads_number"
+        "reads_number",
+        "out_dir"
     ]
-
-    currentDirectory = os.getcwd()
     wdir = pathlib.Path(__file__).parent.absolute()
     config = {
         # Default settings
         #########################################################
         # Input settings
         "name":"test",
-        "bedfile":"",
+        "bedfile":wdir+'/test_data/hg38_knownGene_seq_s.bed',
         "seq_index":12, # 0 based
 
         # Genome ecc settings
@@ -249,13 +273,13 @@ def main(argv):
         "read_len":75,
         
         # Output_settings
-        "reads_number":1000
+        "reads_number":1000,
+        "out_dir":wdir+"/out"
     }
-    
-    config_file = ""
+
     version=0.1
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "c:n:f:a:s:i:o:h:v", ["config",'no-indexing','no-alignment'])
+        opts, args = getopt.getopt(sys.argv[1:], "h:t:n:f:b:e:o:i", ["em",'es','ei','ea','en','fm','fs',"fi","fa","fn","a5","a3","l","r"])
     except getopt.GetoptError as err:
         print(err)
         printHelp()
@@ -273,10 +297,18 @@ def main(argv):
         if opt == '-h':
             printHelp()
             sys.exit(0)
+        elif opt == '-t':
+            config["type"] = arg
         elif opt == '-n':
             config["name"] = arg
+        elif opt == '-f':
+            config["fasta"] = arg
         elif opt == '-b':
             config["bedfile"] = arg
+        elif opt == '-e':
+            config["bedtools"] = arg
+        elif opt == '-o':
+            config["out_dir"] = arg
         elif opt == '-i':
             config["seq_index"] = int(arg)
         elif opt == '-em':
@@ -309,15 +341,21 @@ def main(argv):
             config["reads_number"] = int(arg)
 
     print('##  ------------------ The configs are as following ....  -----------------')
-    for key, item in config:
-        print("## "+key+"="+str(item)+"\n")
-    print('##  ------------------            End Settings             ----------------')
-    # Run Simulation
-    GeneateFastQ(config,
-                '/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/hg38_knownGene_seq.bed',
-                '/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/seq1.fq',
-                '/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/seq2.fq',
-                '/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/out.tsv')
+    ecc_config = config['out_dir']+"/"+config['name']+".config"
+    CONFIG = open(ecc_config,'w')
+    if config['type']=="b":
+        for key in bed_key_ls:
+            item = config[key]
+            print("## "+key+"="+str(item)+"\n")
+            CONFIG.write(key+"="+str(item)+"\n")
+        CreateBED(config)
+    else:
+        for key in fastq_key_ls:
+            item = config[key]
+            print("## "+key+"="+str(item)+"\n")
+            CONFIG.write(key+"="+str(item)+"\n")
+        GeneateFastQ(config)
+    CONFIG.close()
     exit(0)
     
 if __name__ == "__main__":
