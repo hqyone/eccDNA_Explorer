@@ -82,3 +82,85 @@ else
     echo "BedTools was installed at $bin_dir/bedtools2/bin"
     cd $wdir
 fi
+
+# BedTools
+SAMTools="$binDir/samtools/samtools"
+if [[ -x "$(command -v $SAMTools)" ]]
+then
+    echo "SAMTools is found at $SAMTools"
+else
+    echo "install SAMTools ... "
+    bin_dir="$binDir"
+    if [[ -d $bin_dir ]]
+    then
+        echo "$bin_dir exist skip create the dir"
+    else
+        mkdir $bin_dir
+    fi
+    cd $bin_dir
+    git clone https://github.com/samtools/htslib.git
+    cd "$bin_dir/htslib"
+    make
+    make install
+    cd $bin_dir
+    git clone https://github.com/samtools/samtools.git
+    cd "$bin_dir/samtools"
+    make
+    make install
+    echo "SAMTools was installed at $bin_dir/samtools/samtools"
+    cd $wdir
+fi
+
+
+# Human Genome FASTA and GTF downloading and indexing
+cd $wdir
+#genome_dir="$wdir/genome"
+genome_dir="/Volumes/Backup_Plus/genome/hg38"
+gfa_url="https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/latest/hg38.fa.gz"
+gfa_gz_file=`basename $gfa_url`
+GenomeFASTA="$genome_dir/${gfa_gz_file/.fa.gz/.fa}"
+
+gtf_url="https://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/genes/hg38.knownGene.gtf.gz"
+gtf_gz_file=`basename $gtf_url`
+GenomeGTF="$genome_dir/${gtf_gz_file/.gtf.gz/.gtf}"
+
+if ! [[ -d $genome_dir ]];then
+    mkdir "$genome_dir"
+fi
+
+cd $genome_dir
+if [[ -f $GenomeFASTA ]];then
+    echo "Find the genome fasta file at $GenomeFASTA"
+else
+    wget $gfa_url -O $gfa_gz_file
+    gunzip -c $gfa_gz_file > $GenomeFASTA
+    rm $gfa_gz_file
+fi
+
+if [[ -f $GenomeGTF ]];then
+    echo "Find the genome GTF file at $GenomeGTF"
+else
+    wget $gtf_url -O $gtf_gz_file
+    gunzip -c $gtf_gz_file > $GenomeGTF
+    rm $gtf_gz_file
+fi
+
+# Index genome by BWA
+#bwa_index_file=${GenomeFASTA%".fa"}.bwt
+bwa_index_file="$GenomeFASTA.bwt"
+echo $bwa_index_file
+if ! [ -f $bwa_index_file ];then
+    echo "Indexing genome by bwa"
+    eval "$BWA index $GenomeFASTA"
+    #echo $output
+fi
+
+# Index genome by SAMTOOLS
+#samtools_index_file=${GenomeFASTA%".fa"}.bai
+samtools_index_file="$GenomeFASTA.fai"
+echo $samtools_index_file
+if ! [ -f $samtools_index_file ];then
+    echo "Indexing genome by SAMTools"
+    eval "$SAMTools faidx $GenomeFASTA"
+    #echo $output
+fi

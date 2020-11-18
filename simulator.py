@@ -7,7 +7,6 @@
 #  Email: hqyone@hotmail.com
 #  Freely distributed under the GNU General Public License (GPLv3)
 #
-
 # Simulater generate artificial FASTQ file for eccDNA
 
 import numpy as np
@@ -119,38 +118,41 @@ def GeneateFastQ(config):
     for line in BED:
         line = line.strip()
         contents = line.split('\t')
-        #chro = contents[0]
+        chro = contents[0]
         start = int(contents[1])
         #end = int(contents[2])
         if len(contents)<col_index+1:
             continue
         seq = contents[col_index]
-        head_str="\t".join(line[:6])
+        head_str="\t".join(contents[:6])
         if len(seq)>ecc_len_min and len(seq)<ecc_len_max:
-            ecc_num = random.choice(range(0,ecc_num))
-            if ecc_num>0:
+            ecc_number = random.choice(range(0,ecc_num+1))
+            if ecc_number<=0:
                 continue
             # Get eccDNA from a read in bed files
-            region_array = eccRegion(seq, ecc_len_mean, ecc_len_std, ecc_len_min, ecc_len_max, ecc_num)
+            region_array = eccRegion(seq, ecc_len_mean, ecc_len_std, ecc_len_min, ecc_len_max, ecc_number)
             for r in region_array:
                 r_start = start+r['start']
                 r_end = start+r['end']
-                circ_len = random.choice(range(len(r['seq']), len(r['seq'])*10)*10)
+                source_infor= chro+":"+str(r_start)+"-"+str(r_end)
+                circ_len = random.choice(range(len(r['seq']), len(r['seq'])*10))*10
                 (ecc_t_seq, ecc_t_start, ecc_t_end) = circ_amplifySeq(r['seq'], circ_len)
+                f_num = random.choice(range(1,100))
                 f_seq_array= eccRegion(ecc_t_seq, f_mean, f_std, f_min, f_max, f_num) #Break to fragment
-                tsv_line = head_str+"\t"+str(r_start)+"\t"+str(r_end)+"\t"+str(circ_len)+"\t"+str(len(f_seq_array))+"\n"
-                TSV.write(tsv_line)
+                f_line = head_str+"\t"+str(r_start)+"\t"+str(r_end)+"\t"+str(circ_len)+"\t"+str(len(f_seq_array))
                 for f in f_seq_array:
                     f_seq = f['seq']
                     if len(f_seq)>read_len-len(adapter_5):
                         af_seq = adapter_5+f_seq+adapter_3
                         seq1= af_seq[0:read_len+len(adapter_5)]
                         seq2= get_rc_sequence(af_seq[-(read_len+len(adapter_5)):])
-                        FQ1.write("@seq_"+str(seq_index)+"\n")
+                        tsv_line = "@seq_"+str(seq_index)+"\t"+f_line+"\t"+f_seq+"\n"
+                        TSV.write(tsv_line)
+                        FQ1.write("@seq_"+str(seq_index)+"|"+source_infor+"\n")
                         FQ1.write(seq1+"\n")
                         FQ1.write("+\n")
                         FQ1.write("I"*len(seq1)+"\n")
-                        FQ2.write("@seq_"+str(seq_index)+"\n")
+                        FQ2.write("@seq_"+str(seq_index)+"|"+source_infor+"\n")
                         FQ2.write(seq2+"\n")
                         FQ2.write("+\n")
                         FQ2.write("I"*len(seq1)+"\n")
@@ -177,7 +179,7 @@ def printHelp():
     print('# -o : The path of the output dir ')
 
     print('#############################################################')
-    print('# Usage: python eccSimulator.py -t g -n -b bedfile, -i 12 .... ')
+    print('# Usage: python eccSimulator.py -t g -n test -b bedfile, -i 12 .... ')
     print('# -t : The processing type, g: geneate FASTQs')
     print('# -n : The name of project')
     print('# -b : Absolute path of tareget regions (BED file) with sequence information')
@@ -244,11 +246,12 @@ def main(argv):
         "reads_number",
         "out_dir"
     ]
-    wdir = pathlib.Path(__file__).parent.absolute()
+    wdir = str(pathlib.Path(__file__).parent.absolute())
     config = {
         # Default settings
         #########################################################
         # Input settings
+        "type":"g",
         "name":"test",
         "bedfile":wdir+'/test_data/hg38_knownGene_seq_s.bed',
         "seq_index":12, # 0 based
@@ -270,16 +273,16 @@ def main(argv):
         # PCR settings
         "adapter_5":"TTTTTTT",
         "adapter_3":"GGGGGGG",
-        "read_len":75,
+        "read_len":100,
         
         # Output_settings
         "reads_number":1000,
-        "out_dir":wdir+"/out"
+        "out_dir":wdir+"/test_data"
     }
 
     version=0.1
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "h:t:n:f:b:e:o:i", ["em",'es','ei','ea','en','fm','fs',"fi","fa","fn","a5","a3","l","r"])
+        opts, args = getopt.getopt(sys.argv[1:], "h:t:n:f:b:e:o:i:", ["em",'es','ei','ea','en','fm','fs',"fi","fa","fn","a5","a3","l","r"])
     except getopt.GetoptError as err:
         print(err)
         printHelp()
@@ -349,12 +352,15 @@ def main(argv):
             print("## "+key+"="+str(item)+"\n")
             CONFIG.write(key+"="+str(item)+"\n")
         CreateBED(config)
-    else:
+    elif config['type']=="g":
         for key in fastq_key_ls:
             item = config[key]
             print("## "+key+"="+str(item)+"\n")
             CONFIG.write(key+"="+str(item)+"\n")
         GeneateFastQ(config)
+    else:
+        print("Unknown processing type. Avaliable type are (b/g)")
+        exit(1)
     CONFIG.close()
     exit(0)
     
