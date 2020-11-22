@@ -318,7 +318,7 @@ def main(argv):
         printHelp()
         sys.exit(2)
     print('###########################################################################################')
-    print('############                      eccSimulator [0.1]                          #############')
+    print('############                      eccSearcher [0.1]                           #############')
     print('############      A tool to identify the small eccDNAs                        #############')
     print('############      Author:  Quanyuan He Ph.D.  Contact: hqyone@hotmail.com     #############')
     print('############      Institution :  School of Medicine, Hunan Normal University  #############')
