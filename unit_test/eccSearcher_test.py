@@ -13,12 +13,13 @@ License: The MIT License (MIT)
 import unittest
 import eccSearcher as es
 
+
 class TestEccDNASearcherMethods(unittest.TestCase):
     def test_upper(self):
-        self.assertTrue("foo".upper(),'FOO')
-    
+        self.assertTrue("foo".upper(), 'FOO')
+
     def test_getClosestPair(self):
-        self.assertTrue(es.getClosestPair([],[]), (None, None, None))
-        self.assertTrue(es.getClosestPair([1,0],[]), (None, None, None))
-        self.assertTrue(es.getClosestPair([0,1],[1]),(0,1,1))
-        self.assertTrue(es.getClosestPair([0],[1]),(1,0,1))
+        self.assertTrue(es.getClosestPair([], []), (None, None, None))
+        self.assertTrue(es.getClosestPair([1, 0], []), (None, None, None))
+        self.assertTrue(es.getClosestPair([0, 1], [1]), (0, 1, 1))
+        self.assertTrue(es.getClosestPair([0], [1]), (1, 0, 1))

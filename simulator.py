@@ -2,32 +2,53 @@
 Author: Quanyuan(Leo) He
 Insititute: Hunan Normal Univeristy
 Date: 2020-11-08 09:38:48
-LastEditTime: 2020-11-21 23:19:07
+LastEditTime: 2020-11-22 00:35:57
 LastEditors: Quanyuan(Leo) He
 Description: 
 FilePath: /eccDNA_Explorer/simulator.py
 License: The MIT License (MIT)
 '''
 #!/usr/bin/env python
-import numpy as np
 import os
 import subprocess
-import sys, getopt
-import time
-import pathlib, shutil
+import sys
+import getopt
+import pathlib
 from scipy.stats import truncnorm
 import random
 
 
 def get_rc_sequence(seq):
+    """
+        Get reverse complemental DNA sequence
+    Args:
+        seq ([string]): [origin seq]
+
+    Returns:
+        [string]: [reverse complemntal DNA sequence]
+    """
     complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A'}
     return "".join(complement.get(base, base) for base in reversed(seq))
 
+
 def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
+    """[summary]
+
+    Args:
+        mean (int, optional): [description]. Defaults to 0.
+        sd (int, optional): [description]. Defaults to 1.
+        low (int, optional): [description]. Defaults to 0.
+        upp (int, optional): [description]. Defaults to 10.
+
+    Returns:
+        [type]: [description]
+    """
     return truncnorm(
         (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
 
 # Run BLAST for a bam file
+
+
 def CreateBED(config):
     try:
         wdir = pathlib.Path(__file__).parent.absolute()
@@ -43,14 +64,16 @@ def CreateBED(config):
         CMD_FILE = open(cmd_bash, "w")
         out_bed_file = outdir + "/"+name+"_seq.bed"
         # bedtools getfasta -fi hg38.fa -bed hg38_knownGene.bed -bedOut>hg38_knownGene_seq.bed
-        bedtools_cmd = bedtools+" getfasta -fi "+db_fasta+" -bed "+bed+ " -bedOut > "+out_bed_file
+        bedtools_cmd = bedtools+" getfasta -fi "+db_fasta + \
+            " -bed "+bed + " -bedOut > "+out_bed_file
         print(bedtools_cmd)
         CMD_FILE.write(bedtools_cmd)
         CMD_FILE.close()
         #os.popen("bash " + cmd_bash)
-        process = subprocess.Popen("bash " + cmd_bash, shell=True, stdout=subprocess.PIPE)
+        process = subprocess.Popen(
+            "bash " + cmd_bash, shell=True, stdout=subprocess.PIPE)
         process.wait()
-        print (process.returncode)
+        print(process.returncode)
         os.remove(cmd_bash)
         print("Finish processing " + name)
         return out_bed_file
@@ -58,37 +81,40 @@ def CreateBED(config):
         print("Unexpected error:", sys.exc_info()[0])
         return ""
 
+
 def eccRegion(seq, mean, sd, low, upp, number=1):
-    if low>len(seq) or low>upp:
+    if low > len(seq) or low > upp:
         return None
     else:
         L = get_truncated_normal(mean=mean, sd=sd, low=low, upp=len(seq))
         ecc_len_ls = map(int, L.rvs(number))
-        region_array=[]
+        region_array = []
         for ecc_len in ecc_len_ls:
-            start = random.choice (range(0, len(seq)-ecc_len))
+            start = random.choice(range(0, len(seq)-ecc_len))
             end = start+ecc_len
             sub_str = seq[start: end]
-            region_array.append({"seq":sub_str, "start":start, "end":end})
+            region_array.append({"seq": sub_str, "start": start, "end": end})
         return region_array
+
 
 def circ_amplifySeq(seq, length):
     folds = int(length/len(seq)+1)
     ext_seq = seq*folds
-    start = random.choice (range(0, len(ext_seq)-length))
+    start = random.choice(range(0, len(ext_seq)-length))
     end = start+length
-    if length<len(seq):
-        loc_str= str(len(seq)-start)+"|0"
+    if length < len(seq):
+        loc_str = str(len(seq)-start)+"|0"
         return (ext_seq[start: end], start, end, loc_str)
     else:
-        left_len=len(seq)-start
-        right_len=(length-left_len)%len(seq)
+        left_len = len(seq)-start
+        right_len = (length-left_len) % len(seq)
         rep_num = int((length-left_len-right_len)/len(seq))
         loc_str = str(left_len)+("|"+str(len(seq)))*rep_num+"|"+str(right_len)
         return (ext_seq[start: end], start, end, loc_str)
 
-print(circ_amplifySeq("AAG",5))
-print(circ_amplifySeq("AAG",10))
+
+print(circ_amplifySeq("AAG", 5))
+print(circ_amplifySeq("AAG", 10))
 
 
 def GeneateFastQ(config):
@@ -96,37 +122,37 @@ def GeneateFastQ(config):
     fastq1 = config['out_dir']+"/"+config['name']+"_1.fastq"
     fastq2 = config['out_dir']+"/"+config['name']+"_2.fastq"
     ecc_tsv = config['out_dir']+"/"+config['name']+".tsv"
-    
-    col_index=12
+
+    col_index = 12
     #seqs = getSeq(bedfile)
-    BED=open(bedfile,'r')
-    TSV=open(ecc_tsv,'w')
-    FQ1=open(fastq1,'w')
-    FQ2=open(fastq2,'w')
+    BED = open(bedfile, 'r')
+    TSV = open(ecc_tsv, 'w')
+    FQ1 = open(fastq1, 'w')
+    FQ2 = open(fastq2, 'w')
 
     random.seed(30)
     # Genome extraction setting
     ecc_len_mean = config["ecc_len_mean"]
     ecc_len_std = config["ecc_len_std"]
     ecc_len_min = config["ecc_len_min"]
-    ecc_len_max = config["ecc_len_max"]  #2M
-    ecc_num = config["ecc_num"] 
-    
+    ecc_len_max = config["ecc_len_max"]  # 2M
+    ecc_num = config["ecc_num"]
+
     # Fragmentation settings
-    f_mean = config["f_mean"] 
+    f_mean = config["f_mean"]
     f_std = config["f_std"]
     f_min = config["f_min"]
     f_max = config["f_max"]
-    f_num = random.choice(range(1,100))
-    
+    f_num = random.choice(range(1, 100))
+
     # PCR settings
     adapter_5 = config["adapter_5"]
     adapter_3 = config["adapter_3"]
     read_len = config["read_len"]
-    
+
     # Output_settings
     reads_number = config["reads_number"]
-    
+
     seq_index = 0
     for line in BED:
         line = line.strip()
@@ -134,65 +160,77 @@ def GeneateFastQ(config):
         chro = contents[0]
         start = int(contents[1])
         #end = int(contents[2])
-        if len(contents)<col_index+1:
+        if len(contents) < col_index+1:
             continue
         seq = contents[col_index]
-        head_str="\t".join(contents[:6])
-        if len(seq)>ecc_len_min and len(seq)<ecc_len_max:
-            ecc_number = random.choice(range(0,ecc_num+1))
-            if ecc_number<=0:
+        head_str = "\t".join(contents[:6])
+        if len(seq) > ecc_len_min and len(seq) < ecc_len_max:
+            ecc_number = random.choice(range(0, ecc_num+1))
+            if ecc_number <= 0:
                 continue
             # Get eccDNA from a read in bed files
-            region_array = eccRegion(seq, ecc_len_mean, ecc_len_std, ecc_len_min, ecc_len_max, ecc_number)
+            region_array = eccRegion(
+                seq, ecc_len_mean, ecc_len_std, ecc_len_min, ecc_len_max, ecc_number)
             for r in region_array:
                 r_start = start+r['start']
                 r_end = start+r['end']
                 unit_len = len(r['seq'])
-                source_infor= chro+":"+str(r_start)+"-"+str(r_end)
-                circ_len = random.choice(range(len(r['seq']), len(r['seq'])*10))*10
-                (ecc_t_seq, ecc_t_start, ecc_t_end, loc_str) = circ_amplifySeq(r['seq'], circ_len)
-                f_num = random.choice(range(1,100))
-                f_seq_array= eccRegion(ecc_t_seq, f_mean, f_std, f_min, f_max, f_num) #Break to fragment
-                f_line = head_str+"\t"+str(r_start)+"\t"+str(r_end)+"\t"+str(circ_len)+"\t"+str(len(f_seq_array))
+                source_infor = chro+":"+str(r_start)+"-"+str(r_end)
+                circ_len = random.choice(
+                    range(len(r['seq']), len(r['seq'])*10))*10
+                (ecc_t_seq, ecc_t_start, ecc_t_end,
+                 loc_str) = circ_amplifySeq(r['seq'], circ_len)
+                f_num = random.choice(range(1, 100))
+                f_seq_array = eccRegion(
+                    ecc_t_seq, f_mean, f_std, f_min, f_max, f_num)  # Break to fragment
+                f_line = head_str+"\t" + \
+                    str(r_start)+"\t"+str(r_end)+"\t" + \
+                    str(circ_len)+"\t"+str(len(f_seq_array))
                 for f in f_seq_array:
                     f_seq = f['seq']
-                    f_start =  f['start']
+                    f_start = f['start']
                     f_end = f['end']
                     f_len = f_end - f_start
-                    r_type="unknown"
-                    if int((ecc_t_start+f_start+read_len)/unit_len)-int((ecc_t_start+f_start)/unit_len)>0 or \
-                        int((ecc_t_start+f_start+len(f_seq))/unit_len)-int((ecc_t_start+f_start+len(f_seq)-read_len)/unit_len)>0:
-                        r_type="jun"
-                    elif int((ecc_t_start+f_start+len(f_seq)-read_len)/unit_len)-int((ecc_t_start+f_start+read_len)/unit_len)>0:
-                        r_type="span"
-                        
-                    if len(f_seq)>read_len-len(adapter_5):
+                    r_type = "unknown"
+                    if int((ecc_t_start+f_start+read_len)/unit_len)-int((ecc_t_start+f_start)/unit_len) > 0 or \
+                            int((ecc_t_start+f_start+len(f_seq))/unit_len)-int((ecc_t_start+f_start+len(f_seq)-read_len)/unit_len) > 0:
+                        r_type = "jun"
+                    elif int((ecc_t_start+f_start+len(f_seq)-read_len)/unit_len)-int((ecc_t_start+f_start+read_len)/unit_len) > 0:
+                        r_type = "span"
+
+                    if len(f_seq) > read_len-len(adapter_5):
                         af_seq = adapter_5+f_seq+adapter_3
-                        seq1= af_seq[0:read_len+len(adapter_5)]
-                        seq2= get_rc_sequence(af_seq[-(read_len+len(adapter_3)):])
-                        if random.uniform(0, 1)>0.5:
-                            (seq1, seq2)=(seq2, seq1)
-                        tsv_line = "@seq_"+str(seq_index)+"\t"+f_line+"\t"+r_type+"\t"+f_seq+"\n"
+                        seq1 = af_seq[0:read_len+len(adapter_5)]
+                        seq2 = get_rc_sequence(
+                            af_seq[-(read_len+len(adapter_3)):])
+                        if random.uniform(0, 1) > 0.5:
+                            (seq1, seq2) = (seq2, seq1)
+                        tsv_line = "@seq_" + \
+                            str(seq_index)+"\t"+f_line + \
+                            "\t"+r_type+"\t"+f_seq+"\n"
                         TSV.write(tsv_line)
-                        FQ1.write("@seq_"+str(seq_index)+"|"+source_infor+"|"+r_type+"|"+str(f_len)+"\n")
+                        FQ1.write("@seq_"+str(seq_index)+"|" +
+                                  source_infor+"|"+r_type+"|"+str(f_len)+"\n")
                         FQ1.write(seq1+"\n")
                         FQ1.write("+\n")
                         FQ1.write("I"*len(seq1)+"\n")
-                        FQ2.write("@seq_"+str(seq_index)+"|"+source_infor+"|"+r_type+"|"+str(f_len)+"\n")
+                        FQ2.write("@seq_"+str(seq_index)+"|" +
+                                  source_infor+"|"+r_type+"|"+str(f_len)+"\n")
                         FQ2.write(seq2+"\n")
                         FQ2.write("+\n")
                         FQ2.write("I"*len(seq1)+"\n")
-                        seq_index+=1
-                        if seq_index>=reads_number:
+                        seq_index += 1
+                        if seq_index >= reads_number:
                             break
-                if seq_index>=reads_number:
+                if seq_index >= reads_number:
                     break
-        if seq_index>=reads_number:
+        if seq_index >= reads_number:
             break
     TSV.close()
     FQ1.close()
     FQ2.close()
     BED.close()
+
 
 def printHelp():
     print('#############################################################')
@@ -231,10 +269,12 @@ def printHelp():
     print('# Output 3: <out_dir>/ecc_tsv , Two pair-end FASTQ files')
 
 # Main function
+
+
 def main(argv):
-    #print(eccRegion("ATTTATTAGGGGGAACCCCATTT",4,3,2,10,1))
-    #print(circ_amplifySeq("ATTTATTAGGGGGAACCCCATTT",800))
-    bed_key_ls= [
+    # print(eccRegion("ATTTATTAGGGGGAACCCCATTT",4,3,2,10,1))
+    # print(circ_amplifySeq("ATTTATTAGGGGGAACCCCATTT",800))
+    bed_key_ls = [
         # Input settings
         "name",
         "fastq",
@@ -255,14 +295,14 @@ def main(argv):
         "ecc_len_min",
         "ecc_len_max",
         "ecc_num",
-        
+
         # Fragmentation settings
         "f_mean",
         "f_std",
         "f_min",
         "f_max",
         "f_num",
-        
+
         # Sequencing  settings
         "adapter_5",
         "adapter_3",
@@ -277,44 +317,46 @@ def main(argv):
         # Default settings
         #########################################################
         # Input settings
-        "type":"g",
-        "name":"test",
-        "bedfile":wdir+'/test_data/hg38_knownGene_seq_s.bed',
-        "seq_index":12, # 0 based
+        "type": "g",
+        "name": "test",
+        "bedfile": wdir+'/test_data/hg38_knownGene_seq_s.bed',
+        "seq_index": 12,  # 0 based
 
         # Genome ecc settings
-        "ecc_len_mean":400,
-        "ecc_len_std":800,
-        "ecc_len_min":200,
-        "ecc_len_max":200000,  #200K
-        "ecc_num":1,
-        
+        "ecc_len_mean": 400,
+        "ecc_len_std": 800,
+        "ecc_len_min": 200,
+        "ecc_len_max": 200000,  # 200K
+        "ecc_num": 1,
+
         # Fragmentation settings
-        "f_mean":300,
-        "f_std":200,
-        "f_min":100,
-        "f_max":1000,
-        "f_num":random.choice(range(1,100)),
-        
+        "f_mean": 300,
+        "f_std": 200,
+        "f_min": 100,
+        "f_max": 1000,
+        "f_num": random.choice(range(1, 100)),
+
         # PCR settings
-        "adapter_5":"TTTTTTT",
-        "adapter_3":"GGGGGGG",
-        "read_len":100,
-        
+        "adapter_5": "TTTTTTT",
+        "adapter_3": "GGGGGGG",
+        "read_len": 100,
+
         # Output_settings
-        "reads_number":1000,
-        "out_dir":wdir+"/test_data"
+        "reads_number": 1000,
+        "out_dir": wdir+"/test_data"
     }
 
-    version=0.1
+    version = 0.1
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "h:t:n:f:b:e:o:i:", ["em",'es','ei','ea','en','fm','fs',"fi","fa","fn","a5","a3","l","r"])
+        opts, args = getopt.getopt(sys.argv[1:], "h:t:n:f:b:e:o:i:l:r:", [
+                                   "em=", 'es=', 'ei=', 'ea=', 'en=', 'fm=', 'fs=', "fi=", "fa=", "fn=", "a5=", "a3="])
     except getopt.GetoptError as err:
         print(err)
         printHelp()
         sys.exit(2)
     print('###########################################################################################')
-    print('############                      eccSimulator ['+str(version)+"]             #############")
+    print(
+        '############                      eccSimulator ['+str(version)+"]             #############")
     print('############      A tool to generate ecc FASTQ files                          #############')
     print('############      Author:  Quanyuan He Ph.D  Contact: hqyone@hotmail.com      #############')
     print('############      Institution :  School of Medicine, Hunan Normal University  #############')
@@ -371,14 +413,14 @@ def main(argv):
 
     print('##  ------------------ The configs are as following ....  -----------------')
     ecc_config = config['out_dir']+"/"+config['name']+".config"
-    CONFIG = open(ecc_config,'w')
-    if config['type']=="b":
+    CONFIG = open(ecc_config, 'w')
+    if config['type'] == "b":
         for key in bed_key_ls:
             item = config[key]
             print("## "+key+"="+str(item)+"\n")
             CONFIG.write(key+"="+str(item)+"\n")
         CreateBED(config)
-    elif config['type']=="g":
+    elif config['type'] == "g":
         for key in fastq_key_ls:
             item = config[key]
             print("## "+key+"="+str(item)+"\n")
@@ -389,6 +431,7 @@ def main(argv):
         exit(1)
     CONFIG.close()
     exit(0)
-    
+
+
 if __name__ == "__main__":
     main(sys.argv[1:])

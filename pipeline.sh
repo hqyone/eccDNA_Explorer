@@ -1,4 +1,15 @@
 #!/bin/bash
+###
+# @Author: Quanyuan(Leo) He
+# @Email: hqyone@gmail.com
+# @Insititute: Hunan Normal Univeristy
+# @Date: 2020-11-06 16:08:18
+# @LastEditTime: 2020-11-22 02:34:32
+# @LastEditors: Quanyuan(Leo) He
+# @Description:
+# @FilePath: /eccDNA_Explorer/pipeline.sh
+# @License: The MIT License (MIT)
+###
 
 wdir=$(pwd);
 if [[ ! -d "$wdir" ]]; then $wdir="$PWD"; fi
@@ -29,9 +40,9 @@ s2_adapter_3=`echo $s1_adapter_5 | tr ACGTacgt TGCAtgca |rev`
 #$Cutadapt -g $adapter_5 $fastq1 > $cut_fastq1 2> report1.txt
 $Cutadapt --pair-adapters \
 -g $s1_adapter_5 \
--a $s1_adapter_3 \
+-g $s2_adapter_5 \
 -G $s2_adapter_5 \
--A $s2_adapter_3 \
+-G $s1_adapter_5 \
 -o $cut_fastq1 \
 -p $cut_fastq2 \
 $fastq1 $fastq2
