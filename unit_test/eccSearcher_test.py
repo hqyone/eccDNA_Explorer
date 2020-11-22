@@ -5,7 +5,7 @@ Insititute: Hunan Normal Univeristy
 Date: 2020-11-21 22:37:51
 LastEditTime: 2020-11-21 23:30:58
 LastEditors: Quanyuan(Leo) He
-Description: 
+Description: Unit test for eccDNAExplorer
 FilePath: /eccDNA_Explorer/unit_test/eccSearcher_test.py
 License: The MIT License (MIT)
 '''
