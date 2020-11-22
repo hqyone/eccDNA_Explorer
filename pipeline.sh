@@ -37,11 +37,14 @@ $Cutadapt --pair-adapters \
 $fastq1 $fastq2
 
 $BWA mem -B 8 -a $GenomeFASTA $cut_fastq1 $cut_fastq2 > aln-pe.sam
-#awk '/^*@SQ/ || ($7=="=" && ($9>100 && $9<100000)){print $0;}' aln-pe.sam>temp.sam
-#awk '/^*@SQ/ || ($3=="chr1" && $4<169301 && $4>167301){print $0;}' aln-pe.sam>temp.sam
+# awk '/^*@SQ/ || ($7=="=" && ($9>100 && $9<100000)){print $0;}' aln-pe.sam>temp.sam
+# awk '/^*@SQ/ || ($3=="chr1" && $4<169301 && $4>167301){print $0;}' aln-pe.sam>temp.sam
 # awk '/^*@SQ/ || ($1~/seq_9\|/ && $3=="chr1" && $4<170301 && $4>166301){print $0;}' aln-pe.sam>temp.sam
-awk '($6~/[0-9]+[HS][0-9]+M/ || $6~/[0-9]+M[0-9]+[HS]/) && $4~/^16/ {print $0}' aln-pe.sam> temp.sam
+awk '/^*@SQ/ || ($6~/100M/  && $3=="chr1" && $4<170301 && $4>166301){print $0;}' aln-pe.sam>temp.sam
+# awk '($6~/[0-9]+[HS][0-9]+M/ || $6~/[0-9]+M[0-9]+[HS]/) && $4~/^16/ {print $0}' aln-pe.sam> temp.sam
 $SAMTools view -bS aln-pe.sam > aln-pe.bam
 $SAMTools sort -o aln-pe_sort.bam aln-pe.bam
 rm aln-pe.bam
-$SAMTools view -u -f 1 -F 12 aln-pe_sort.bam >  aln-pe_sort_map_map.bam
+$SAMTools view -u -f 1 -F 12 aln-pe_sort.bam > aln-pe_sort_map_map.bam
+
+awk '($6~/[0-9]+[HS][0-9]+M/ || $6~/[0-9]+M[0-9]+[HS]/) && $4~/^16/ {print $0}' aln-pe.sam> temp.sam

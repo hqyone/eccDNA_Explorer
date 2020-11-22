@@ -164,3 +164,5 @@ if ! [ -f $samtools_index_file ];then
     eval "$SAMTools faidx $GenomeFASTA"
     #echo $output
 fi
+
+

@@ -1,14 +1,14 @@
-
-# coding=utf-8
-
-#  tRNAExplorer v.1.0 - tRNA profiles and regulation networks
-#  Copyright (C) 2020  Dr. Quanyuan He
-#  School of Medicine, Hunan Normal University
-#  Email: hqyone@hotmail.com
-#  Freely distributed under the GNU General Public License (GPLv3)
-#
-# Simulater generate artificial FASTQ file for eccDNA
-
+'''
+Author: Quanyuan(Leo) He
+Insititute: Hunan Normal Univeristy
+Date: 2020-11-08 09:38:48
+LastEditTime: 2020-11-21 23:19:07
+LastEditors: Quanyuan(Leo) He
+Description: 
+FilePath: /eccDNA_Explorer/simulator.py
+License: The MIT License (MIT)
+'''
+#!/usr/bin/env python
 import numpy as np
 import os
 import subprocess
@@ -59,22 +59,36 @@ def CreateBED(config):
         return ""
 
 def eccRegion(seq, mean, sd, low, upp, number=1):
-    L = get_truncated_normal(mean=mean, sd=sd, low=low, upp=len(seq))
-    region_array=[]
-    for i in range(0, number):
-        ecc_len = random.choice (list(map(int, list(L.rvs(1)))))
-        start = random.choice (range(0, len(seq)-ecc_len))
-        end = start+ecc_len
-        sub_str = seq[start: end]
-        region_array.append({"seq":sub_str, "start":start, "end":end})
-    return region_array  
+    if low>len(seq) or low>upp:
+        return None
+    else:
+        L = get_truncated_normal(mean=mean, sd=sd, low=low, upp=len(seq))
+        ecc_len_ls = map(int, L.rvs(number))
+        region_array=[]
+        for ecc_len in ecc_len_ls:
+            start = random.choice (range(0, len(seq)-ecc_len))
+            end = start+ecc_len
+            sub_str = seq[start: end]
+            region_array.append({"seq":sub_str, "start":start, "end":end})
+        return region_array
 
 def circ_amplifySeq(seq, length):
     folds = int(length/len(seq)+1)
     ext_seq = seq*folds
     start = random.choice (range(0, len(ext_seq)-length))
     end = start+length
-    return (ext_seq[start: end], start, end)
+    if length<len(seq):
+        loc_str= str(len(seq)-start)+"|0"
+        return (ext_seq[start: end], start, end, loc_str)
+    else:
+        left_len=len(seq)-start
+        right_len=(length-left_len)%len(seq)
+        rep_num = int((length-left_len-right_len)/len(seq))
+        loc_str = str(left_len)+("|"+str(len(seq)))*rep_num+"|"+str(right_len)
+        return (ext_seq[start: end], start, end, loc_str)
+
+print(circ_amplifySeq("AAG",5))
+print(circ_amplifySeq("AAG",10))
 
 
 def GeneateFastQ(config):
@@ -82,7 +96,6 @@ def GeneateFastQ(config):
     fastq1 = config['out_dir']+"/"+config['name']+"_1.fastq"
     fastq2 = config['out_dir']+"/"+config['name']+"_2.fastq"
     ecc_tsv = config['out_dir']+"/"+config['name']+".tsv"
-    
     
     col_index=12
     #seqs = getSeq(bedfile)
@@ -134,25 +147,38 @@ def GeneateFastQ(config):
             for r in region_array:
                 r_start = start+r['start']
                 r_end = start+r['end']
+                unit_len = len(r['seq'])
                 source_infor= chro+":"+str(r_start)+"-"+str(r_end)
                 circ_len = random.choice(range(len(r['seq']), len(r['seq'])*10))*10
-                (ecc_t_seq, ecc_t_start, ecc_t_end) = circ_amplifySeq(r['seq'], circ_len)
+                (ecc_t_seq, ecc_t_start, ecc_t_end, loc_str) = circ_amplifySeq(r['seq'], circ_len)
                 f_num = random.choice(range(1,100))
                 f_seq_array= eccRegion(ecc_t_seq, f_mean, f_std, f_min, f_max, f_num) #Break to fragment
                 f_line = head_str+"\t"+str(r_start)+"\t"+str(r_end)+"\t"+str(circ_len)+"\t"+str(len(f_seq_array))
                 for f in f_seq_array:
                     f_seq = f['seq']
+                    f_start =  f['start']
+                    f_end = f['end']
+                    f_len = f_end - f_start
+                    r_type="unknown"
+                    if int((ecc_t_start+f_start+read_len)/unit_len)-int((ecc_t_start+f_start)/unit_len)>0 or \
+                        int((ecc_t_start+f_start+len(f_seq))/unit_len)-int((ecc_t_start+f_start+len(f_seq)-read_len)/unit_len)>0:
+                        r_type="jun"
+                    elif int((ecc_t_start+f_start+len(f_seq)-read_len)/unit_len)-int((ecc_t_start+f_start+read_len)/unit_len)>0:
+                        r_type="span"
+                        
                     if len(f_seq)>read_len-len(adapter_5):
                         af_seq = adapter_5+f_seq+adapter_3
                         seq1= af_seq[0:read_len+len(adapter_5)]
-                        seq2= get_rc_sequence(af_seq[-(read_len+len(adapter_5)):])
-                        tsv_line = "@seq_"+str(seq_index)+"\t"+f_line+"\t"+f_seq+"\n"
+                        seq2= get_rc_sequence(af_seq[-(read_len+len(adapter_3)):])
+                        if random.uniform(0, 1)>0.5:
+                            (seq1, seq2)=(seq2, seq1)
+                        tsv_line = "@seq_"+str(seq_index)+"\t"+f_line+"\t"+r_type+"\t"+f_seq+"\n"
                         TSV.write(tsv_line)
-                        FQ1.write("@seq_"+str(seq_index)+"|"+source_infor+"\n")
+                        FQ1.write("@seq_"+str(seq_index)+"|"+source_infor+"|"+r_type+"|"+str(f_len)+"\n")
                         FQ1.write(seq1+"\n")
                         FQ1.write("+\n")
                         FQ1.write("I"*len(seq1)+"\n")
-                        FQ2.write("@seq_"+str(seq_index)+"|"+source_infor+"\n")
+                        FQ2.write("@seq_"+str(seq_index)+"|"+source_infor+"|"+r_type+"|"+str(f_len)+"\n")
                         FQ2.write(seq2+"\n")
                         FQ2.write("+\n")
                         FQ2.write("I"*len(seq1)+"\n")
@@ -187,7 +213,7 @@ def printHelp():
     print('# -em : The mean of the length of ecc regions, default:400 ')
     print('# -es : The std of the length of ecc regions, default:800 ')
     print('# -ei : The min of the length of ecc regions, default:200 ')
-    print('# -ea : The max of the length of ecc regions, default:200000 ')
+    print('# -ea : The max of the length of ecc regions, default:1000000 ')
     print('# -en : The number of the ecc DNA extracted from a regions> ')
     print('# -fm : The mean of the length of ecc regions>')
     print('# -fs : The mean of the length of ecc regions>')
@@ -197,7 +223,7 @@ def printHelp():
     print('# -a5 : The adapter sequence of 5 terminal')
     print('# -a3 : The adapter sequence of 3 terminal')
     print('# -el : The min and max of ecc fragments, eg: 180,800')
-    print('# -l : The pair-end read length, default: 75')
+    print('# -l : The pair-end read length, default: 100')
     print('# -r : The number of reads in output FASTQ file, default : 100000')
     print('# -o : The path of the output dir ')
     print('# Output 1: <out_dir>/<name>_ecc.tsv , Reads numbers, processing time for each sample')
