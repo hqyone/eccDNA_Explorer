@@ -235,32 +235,35 @@ def SearchEccDNA(bam, outfile, min_len=100, max_len=1000000):
         elif read.is_read2:
             rt = "read2"
         cigar_str = read.cigarstring
-        m = re.match(r"^(\d+)[HS](\d+)M$", cigar_str)
-        n = re.match(r"^(\d+)M(\d+)[HS]$", cigar_str)
-        k = re.match(r"^(\d+)M$", cigar_str)
-        if k:
-            hit_dic['full_match'] = True
-            if chrom not in hit_dic['span_data']:
-                hit_dic['span_data'][chrom] = {'read1': {}, 'read2': {}}
-            loc = start
-            if strand == "-":
-                loc += int(k.groups(0)[0])
-            if rt not in hit_dic['span_data'][chrom]:
-                hit_dic['span_data'][chrom][rt] = {}
-            hit_dic['span_data'][chrom][rt][loc] = strand
-        elif m or n:
-            if chrom not in hit_dic['data']:
-                hit_dic['data'][chrom] = {"read1": {}, "read2": {}}
+        if cigar_str:
+            m = re.match(r"^(\d+)[HS](\d+)M$", cigar_str)
+            n = re.match(r"^(\d+)M(\d+)[HS]$", cigar_str)
+            k = re.match(r"^(\d+)M$", cigar_str)
+            if k:
+                hit_dic['full_match'] = True
+                if chrom not in hit_dic['span_data']:
+                    hit_dic['span_data'][chrom] = {'read1': {}, 'read2': {}}
+                loc = start
+                if strand == "-":
+                    loc += int(k.groups(0)[0])
+                if rt not in hit_dic['span_data'][chrom]:
+                    hit_dic['span_data'][chrom][rt] = {}
+                hit_dic['span_data'][chrom][rt][loc] = strand
+            elif m or n:
+                if chrom not in hit_dic['data']:
+                    hit_dic['data'][chrom] = {"read1": {}, "read2": {}}
 
-            if read.is_read1:
-                if cigar_str not in hit_dic['data'][chrom]["read1"]:
-                    hit_dic['data'][chrom]["read1"][cigar_str] = []
-                hit_dic['data'][chrom]["read1"][cigar_str].append(start)
+                if read.is_read1:
+                    if cigar_str not in hit_dic['data'][chrom]["read1"]:
+                        hit_dic['data'][chrom]["read1"][cigar_str] = []
+                    hit_dic['data'][chrom]["read1"][cigar_str].append(start)
 
-            if read.is_read2:
-                if cigar_str not in hit_dic['data'][chrom]["read2"]:
-                    hit_dic['data'][chrom]["read2"][cigar_str] = []
-                hit_dic['data'][chrom]["read2"][cigar_str].append(start)
+                if read.is_read2:
+                    if cigar_str not in hit_dic['data'][chrom]["read2"]:
+                        hit_dic['data'][chrom]["read2"][cigar_str] = []
+                    hit_dic['data'][chrom]["read2"][cigar_str].append(start)
+        else:
+            continue
     # The last reads
     read_ecc_dic = search_ecc_junctions(hit_dic)
     if isEmpty(read_ecc_dic):
@@ -305,7 +308,7 @@ def main(argv):
     config = {
         # Default settings
         #########################################################
-        "bamfile": "",
+        "bamfile": "aln-pe.sam",
         "max_len": 1000000,
         "min_len": 100,
         "out_bed": wdir+"/ecc_out.bed"
@@ -347,6 +350,7 @@ def main(argv):
     try:
         SearchEccDNA(config["bamfile"], config["out_bed"],
                      config["min_len"], config["max_len"])
+        print("Pipeline finished successfully.")
     except:
         print("Unexpected error:", sys.exc_info()[0])
         exit(1)

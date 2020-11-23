@@ -83,10 +83,12 @@ def CreateBED(config):
 
 
 def eccRegion(seq, mean, sd, low, upp, number=1):
+    if len(seq) < upp:
+        upp = len(seq)
     if low > len(seq) or low > upp:
         return None
     else:
-        L = get_truncated_normal(mean=mean, sd=sd, low=low, upp=len(seq))
+        L = get_truncated_normal(mean, sd, low, upp)
         ecc_len_ls = map(int, L.rvs(number))
         region_array = []
         for ecc_len in ecc_len_ls:
@@ -171,10 +173,14 @@ def GeneateFastQ(config):
             # Get eccDNA from a read in bed files
             region_array = eccRegion(
                 seq, ecc_len_mean, ecc_len_std, ecc_len_min, ecc_len_max, ecc_number)
+            if not region_array:
+                continue
             for r in region_array:
                 r_start = start+r['start']
                 r_end = start+r['end']
                 unit_len = len(r['seq'])
+                if unit_len <= 0:
+                    continue
                 source_infor = chro+":"+str(r_start)+"-"+str(r_end)
                 circ_len = random.choice(
                     range(len(r['seq']), len(r['seq'])*10))*10
@@ -183,6 +189,8 @@ def GeneateFastQ(config):
                 f_num = random.choice(range(1, 100))
                 f_seq_array = eccRegion(
                     ecc_t_seq, f_mean, f_std, f_min, f_max, f_num)  # Break to fragment
+                if not f_seq_array:
+                    continue
                 f_line = head_str+"\t" + \
                     str(r_start)+"\t"+str(r_end)+"\t" + \
                     str(circ_len)+"\t"+str(len(f_seq_array))
@@ -265,8 +273,8 @@ def printHelp():
     print('# -r : The number of reads in output FASTQ file, default : 100000')
     print('# -o : The path of the output dir ')
     print('# Output 1: <out_dir>/<name>_ecc.tsv , Reads numbers, processing time for each sample')
-    print('# Output 2: <out_dir>/<name>_1.fastq & fastq_2 , Two pair-end FASTQ files')
-    print('# Output 3: <out_dir>/ecc_tsv , Two pair-end FASTQ files')
+    print('# Output 2: <out_dir>/<name>_1.fastq , The pair-end Read1 FASTQ file')
+    print('# Output 3: <out_dir>/<name>_2.fastq , The pair-end Read2 FASTQ file')
 
 # Main function
 
@@ -412,24 +420,22 @@ def main(argv):
             config["reads_number"] = int(arg)
 
     print('##  ------------------ The configs are as following ....  -----------------')
-    ecc_config = config['out_dir']+"/"+config['name']+".config"
-    CONFIG = open(ecc_config, 'w')
+    #ecc_config = config['out_dir']+"/"+config['name']+".config"
     if config['type'] == "b":
         for key in bed_key_ls:
             item = config[key]
             print("## "+key+"="+str(item)+"\n")
-            CONFIG.write(key+"="+str(item)+"\n")
+            # CONFIG.write(key+"="+str(item)+"\n")
         CreateBED(config)
     elif config['type'] == "g":
         for key in fastq_key_ls:
             item = config[key]
             print("## "+key+"="+str(item)+"\n")
-            CONFIG.write(key+"="+str(item)+"\n")
+            # CONFIG.write(key+"="+str(item)+"\n")
         GeneateFastQ(config)
     else:
         print("Unknown processing type. Avaliable type are (b/g)")
         exit(1)
-    CONFIG.close()
     exit(0)
 
 

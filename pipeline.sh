@@ -17,6 +17,7 @@ if [[ ! -d "$wdir" ]]; then $wdir="$PWD"; fi
 
 echo " #### GenomeFASTA : $GenomeFASTA"
 echo " #### GenomeGTF : $GenomeGTF"
+echo " #### FastUniq : $FastUniq"
 echo " #### Cutadapt : $Cutadapt"
 echo " #### SeqPrep : $SeqPrep"
 echo " #### BWA : $BWA"
@@ -24,13 +25,14 @@ echo " #### Bedtools : $BedTools"
 echo " #### SAMTools : $SAMTools"
 
 cd $wdir
-python simulator.py
+echo $wdir
+python simulator.py -t g -n test -b $wdir/test_data/hg38_knownGene_seq_s.bed -o $wdir/test_data
 
-fastq1="/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/test_1.fastq"
-fastq2="/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/test_2.fastq"
+fastq1="$wdir/test_data/test_1.fastq"
+fastq2="$wdir/test_data/test_2.fastq"
 
-cut_fastq1="/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/cut_test_1.fastq"
-cut_fastq2="/Users/hqyone/PycharmProjects/eccDNA_Explorer/test_data/cut_test_2.fastq"
+cut_fastq1="$wdir/test_data/cut_test_1.fastq"
+cut_fastq2="$wdir/test_data/cut_test_2.fastq"
 
 s1_adapter_5=TTTTTTT
 s1_adapter_3=GGGGGGG
@@ -47,15 +49,22 @@ $Cutadapt --pair-adapters \
 -p $cut_fastq2 \
 $fastq1 $fastq2
 
+# Removing the redundant pair reads
+echo $cut_fastq1$'\n'$cut_fastq2 > $wdir/test_data/input.file
+echo $FastUniq -i $wdir/test_data/input.file -tq -o $wdir/test_data/fu_1.fq -p $wdir/test_data/fu_2.fq
+$FastUniq -i $wdir/test_data/input.file -tq -o $wdir/test_data/fu_1.fq -p $wdir/test_data/fu_2.fq
+
 $BWA mem -B 8 -a $GenomeFASTA $cut_fastq1 $cut_fastq2 > aln-pe.sam
 # awk '/^*@SQ/ || ($7=="=" && ($9>100 && $9<100000)){print $0;}' aln-pe.sam>temp.sam
 # awk '/^*@SQ/ || ($3=="chr1" && $4<169301 && $4>167301){print $0;}' aln-pe.sam>temp.sam
 # awk '/^*@SQ/ || ($1~/seq_9\|/ && $3=="chr1" && $4<170301 && $4>166301){print $0;}' aln-pe.sam>temp.sam
-awk '/^*@SQ/ || ($6~/100M/  && $3=="chr1" && $4<170301 && $4>166301){print $0;}' aln-pe.sam>temp.sam
+# awk '/^*@SQ/ || ($6~/100M/  && $3=="chr1" && $4<170301 && $4>166301){print $0;}' aln-pe.sam>temp.sam
 # awk '($6~/[0-9]+[HS][0-9]+M/ || $6~/[0-9]+M[0-9]+[HS]/) && $4~/^16/ {print $0}' aln-pe.sam> temp.sam
 $SAMTools view -bS aln-pe.sam > aln-pe.bam
-$SAMTools sort -o aln-pe_sort.bam aln-pe.bam
-rm aln-pe.bam
-$SAMTools view -u -f 1 -F 12 aln-pe_sort.bam > aln-pe_sort_map_map.bam
+$SAMTools sort aln-pe.bam aln-pe_sort
+$SAMTools index aln-pe_sort.bam
+#rm aln-pe.bam
+#rm aln-pe.sam
 
-awk '($6~/[0-9]+[HS][0-9]+M/ || $6~/[0-9]+M[0-9]+[HS]/) && $4~/^16/ {print $0}' aln-pe.sam> temp.sam
+python eccSearcher.py -i aln-pe.bam -o ecc_out.bed
+# awk '($6~/[0-9]+[HS][0-9]+M/ || $6~/[0-9]+M[0-9]+[HS]/) && $4~/^16/ {print $0}' aln-pe.sam> temp.sam
